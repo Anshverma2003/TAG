@@ -8,14 +8,18 @@ const app = express();
 const httpServer = createServer(app);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  credentials: true
+}));
 app.use(express.json());
 
 // Socket.IO setup
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    methods: ['GET', 'POST'],
+    origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    credentials: true
   },
 });
 
