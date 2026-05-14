@@ -99,6 +99,6 @@ export const MAPS = {
   },
 };
 
-export const PLAYER_SPEED = 200; // pixels per second
+export const PLAYER_SPEED = 300; // pixels per second (increased for smoother feel)
 export const TAG_DISTANCE = 30; // distance to tag another player
 export const SERVER_UPDATE_RATE = 1000 / 60; // 60 FPS
