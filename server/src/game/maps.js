@@ -97,4 +97,54 @@ export const MAPS = {
       { x: 700, y: 300 },
     ],
   },
+  platformer: {
+    name: 'Sky Platformer',
+    description: 'Jump between floating platforms in the sky',
+    width: 800,
+    height: 600,
+    backgroundColor: '#87CEEB',
+    playerSize: 20,
+    obstacles: [
+      // Ground level platforms
+      { x: 0, y: 560, width: 200, height: 20, color: '#10b981' },
+      { x: 260, y: 520, width: 300, height: 20, color: '#10b981' },
+      { x: 650, y: 560, width: 150, height: 20, color: '#10b981' },
+      
+      // Mid-low platforms
+      { x: 380, y: 430, width: 290, height: 20, color: '#10b981' },
+      { x: 0, y: 430, width: 100, height: 20, color: '#10b981' },
+      
+      // Middle platforms
+      { x: 320, y: 340, width: 340, height: 20, color: '#10b981' },
+      { x: 0, y: 340, width: 180, height: 20, color: '#10b981' },
+      
+      // Mid-high platforms
+      { x: 0, y: 250, width: 280, height: 20, color: '#10b981' },
+      { x: 450, y: 250, width: 250, height: 20, color: '#10b981' },
+      
+      // Top platforms
+      { x: 630, y: 130, width: 170, height: 20, color: '#10b981' },
+      { x: 320, y: 130, width: 200, height: 20, color: '#10b981' },
+      
+      // Trees (decorative vertical obstacles)
+      { x: 100, y: 500, width: 30, height: 60, color: '#059669' },
+      { x: 500, y: 370, width: 30, height: 60, color: '#059669' },
+      { x: 140, y: 280, width: 30, height: 60, color: '#059669' },
+      { x: 720, y: 70, width: 30, height: 60, color: '#059669' },
+      
+      // Small blocks/obstacles
+      { x: 240, y: 280, width: 50, height: 50, color: '#10b981' },
+      { x: 580, y: 470, width: 40, height: 40, color: '#f59e0b' },
+    ],
+    spawnPoints: [
+      { x: 100, y: 540 },
+      { x: 450, y: 500 },
+      { x: 120, y: 230 },
+      { x: 580, y: 230 },
+      { x: 480, y: 320 },
+      { x: 700, y: 110 },
+      { x: 400, y: 110 },
+      { x: 550, y: 410 },
+    ],
+  },
 };
