@@ -91,7 +91,7 @@ function GamePage({ gameState, playerId, roomData }) {
       {/* Controls Help */}
       <div className="mt-4 p-3 bg-blue-50 rounded-lg text-center">
         <p className="text-gray-700 font-semibold">
-          🎮 Controls: WASD or Arrow Keys to Move
+          🎮 Controls: A/D or Arrow Keys to Move Left/Right • SPACEBAR to Jump
         </p>
       </div>
     </div>

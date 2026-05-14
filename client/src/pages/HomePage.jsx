@@ -182,7 +182,8 @@ function HomePage({ onCreateRoom, onJoinRoom }) {
           <li>• Taggers try to tag other players</li>
           <li>• Tagged players become taggers too</li>
           <li>• Survive until time runs out to win!</li>
-          <li>• Use WASD or Arrow keys to move</li>
+          <li>• Use A/D or Arrow keys to move left/right</li>
+          <li>• Press SPACEBAR to jump</li>
         </ul>
       </div>
     </div>

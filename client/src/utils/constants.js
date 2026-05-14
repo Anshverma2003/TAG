@@ -150,5 +150,7 @@ export const MAPS = {
 };
 
 export const PLAYER_SPEED = 300; // pixels per second (increased for smoother feel)
+export const JUMP_FORCE = 450; // Jump velocity
+export const GRAVITY = 1200; // Gravity acceleration
 export const TAG_DISTANCE = 30; // distance to tag another player
 export const SERVER_UPDATE_RATE = 1000 / 60; // 60 FPS

@@ -1,6 +1,8 @@
 import { MAPS } from '../game/maps.js';
 
-const PLAYER_SPEED = 200; // pixels per second
+const PLAYER_SPEED = 300; // pixels per second
+const JUMP_FORCE = 450; // Jump velocity
+const GRAVITY = 1200; // Gravity acceleration
 const TAG_DISTANCE = 30; // distance to tag
 const UPDATE_RATE = 1000 / 60; // 60 FPS
 
@@ -23,6 +25,7 @@ export class GameController {
         y: spawnPoint.y,
         vx: 0,
         vy: 0,
+        onGround: false,
         isTagger: false,
       };
     });
@@ -64,7 +67,7 @@ export class GameController {
         gameState.timeRemaining - deltaTime
       );
 
-      // Update player positions
+      // Update player positions with platformer physics
       this.updatePlayerPositions(gameState, mapData, deltaTime);
 
       // Check for collisions/tags
@@ -88,64 +91,115 @@ export class GameController {
     this.gameLoops.set(roomCode, gameLoop);
   }
 
-  updatePlayerMovement(roomCode, playerId, dx, dy) {
+  updatePlayerMovement(roomCode, playerId, dx, jump) {
     const gameState = this.games.get(roomCode);
     if (!gameState) return;
 
     const player = gameState.players.find(p => p.id === playerId);
     if (player) {
+      // Horizontal movement
       player.vx = dx * PLAYER_SPEED;
-      player.vy = dy * PLAYER_SPEED;
+      
+      // Jump (only if on ground)
+      if (jump && player.onGround) {
+        player.vy = -JUMP_FORCE;
+        player.onGround = false;
+      }
     }
   }
 
-  updatePlayerPositions(gameState, mapData, deltaTime) {
-    gameState.players.forEach(player => {
-      // Calculate new position
-      let newX = player.x + player.vx * deltaTime;
-      let newY = player.y + player.vy * deltaTime;
-
-      // Check map boundaries
-      const playerRadius = mapData.playerSize / 2;
-      newX = Math.max(playerRadius, Math.min(mapData.width - playerRadius, newX));
-      newY = Math.max(playerRadius, Math.min(mapData.height - playerRadius, newY));
-
-      // Check obstacle collisions
-      let collided = false;
-      for (const obstacle of mapData.obstacles) {
-        if (this.checkRectCircleCollision(obstacle, newX, newY, playerRadius)) {
-          collided = true;
-          break;
-        }
+  // Check if player is standing on a platform
+  isPlayerOnGround(player, mapData) {
+    const playerRadius = mapData.playerSize / 2;
+    const feet = player.y + playerRadius;
+    
+    for (const obstacle of mapData.obstacles) {
+      // Check if feet are touching top of platform
+      if (player.x + playerRadius > obstacle.x && 
+          player.x - playerRadius < obstacle.x + obstacle.width &&
+          feet >= obstacle.y &&
+          feet <= obstacle.y + 5 &&
+          player.vy >= 0) {
+        return { onGround: true, groundY: obstacle.y - playerRadius };
       }
-
-      // Only update position if no collision
-      if (!collided) {
-        player.x = newX;
-        player.y = newY;
-      }
-
-      // Apply friction
-      player.vx *= 0.9;
-      player.vy *= 0.9;
-
-      // Stop if velocity is very small
-      if (Math.abs(player.vx) < 1) player.vx = 0;
-      if (Math.abs(player.vy) < 1) player.vy = 0;
-    });
+    }
+    
+    // Check bottom boundary
+    if (feet >= mapData.height) {
+      return { onGround: true, groundY: mapData.height - playerRadius };
+    }
+    
+    return { onGround: false, groundY: null };
   }
 
-  checkRectCircleCollision(rect, cx, cy, radius) {
-    // Find closest point on rectangle to circle center
-    const closestX = Math.max(rect.x, Math.min(cx, rect.x + rect.width));
-    const closestY = Math.max(rect.y, Math.min(cy, rect.y + rect.height));
+  // Check horizontal collision with obstacles
+  checkHorizontalCollision(player, newX, mapData) {
+    const playerRadius = mapData.playerSize / 2;
+    
+    for (const obstacle of mapData.obstacles) {
+      // Check if player is at same height as obstacle
+      if (player.y + playerRadius > obstacle.y && 
+          player.y - playerRadius < obstacle.y + obstacle.height) {
+        
+        // Check right side collision
+        if (player.vx > 0 && newX + playerRadius >= obstacle.x && player.x + playerRadius < obstacle.x) {
+          return obstacle.x - playerRadius;
+        }
+        
+        // Check left side collision
+        if (player.vx < 0 && newX - playerRadius <= obstacle.x + obstacle.width && player.x - playerRadius > obstacle.x + obstacle.width) {
+          return obstacle.x + obstacle.width + playerRadius;
+        }
+      }
+    }
+    
+    return newX;
+  }
 
-    // Calculate distance
-    const distanceX = cx - closestX;
-    const distanceY = cy - closestY;
-    const distanceSquared = distanceX * distanceX + distanceY * distanceY;
-
-    return distanceSquared < radius * radius;
+  updatePlayerPositions(gameState, mapData, deltaTime) {
+    const playerRadius = mapData.playerSize / 2;
+    
+    gameState.players.forEach(player => {
+      // Apply gravity
+      player.vy += GRAVITY * deltaTime;
+      
+      // Cap falling speed
+      player.vy = Math.min(player.vy, 800);
+      
+      // Update horizontal position
+      let newX = player.x + player.vx * deltaTime;
+      
+      // Check map boundaries
+      newX = Math.max(playerRadius, Math.min(mapData.width - playerRadius, newX));
+      
+      // Check horizontal collision with obstacles
+      newX = this.checkHorizontalCollision(player, newX, mapData);
+      player.x = newX;
+      
+      // Update vertical position
+      let newY = player.y + player.vy * deltaTime;
+      
+      // Check ground collision
+      const { onGround, groundY } = this.isPlayerOnGround(
+        { ...player, y: newY }, 
+        mapData
+      );
+      
+      if (onGround) {
+        player.y = groundY;
+        player.vy = 0;
+        player.onGround = true;
+      } else {
+        player.y = newY;
+        player.onGround = false;
+      }
+      
+      // Apply friction to horizontal movement
+      player.vx *= 0.85;
+      
+      // Stop if velocity is very small
+      if (Math.abs(player.vx) < 5) player.vx = 0;
+    });
   }
 
   checkTagCollisions(gameState) {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, forwardRef } from 'react';
 import { socket } from '../socket/socket';
-import { MAPS, PLAYER_SPEED } from '../utils/constants';
+import { MAPS, PLAYER_SPEED, JUMP_FORCE, GRAVITY } from '../utils/constants';
 
 const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
   const canvasRef = useRef(null);
@@ -8,7 +8,7 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
   const lastUpdateTime = useRef(Date.now());
   const gameStateRef = useRef(gameState);
   const animationFrameId = useRef(null);
-  const localPlayerPos = useRef({ x: 0, y: 0 }); // Client-side prediction
+  const localPlayerPos = useRef({ x: 0, y: 0, vy: 0 }); // Client-side prediction with vertical velocity
   const interpolatedPlayers = useRef(new Map()); // Smooth interpolation for other players
 
   const mapData = MAPS[roomData.settings.mapId];
@@ -21,12 +21,17 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
     if (gameState && gameState.players) {
       gameState.players.forEach((player) => {
         if (player.id === playerId) {
-          // Only update local player if not moving (sync with server)
-          if (!keysPressed.current['w'] && !keysPressed.current['a'] && 
-              !keysPressed.current['s'] && !keysPressed.current['d'] &&
-              !keysPressed.current['arrowup'] && !keysPressed.current['arrowleft'] &&
-              !keysPressed.current['arrowdown'] && !keysPressed.current['arrowright']) {
-            localPlayerPos.current = { x: player.x, y: player.y };
+          // Sync with server position periodically
+          const currentPlayer = gameState.players.find(p => p.id === playerId);
+          if (currentPlayer) {
+            // Soft sync to avoid jitter
+            const distX = Math.abs(localPlayerPos.current.x - currentPlayer.x);
+            const distY = Math.abs(localPlayerPos.current.y - currentPlayer.y);
+            if (distX > 50 || distY > 50) {
+              localPlayerPos.current.x = currentPlayer.x;
+              localPlayerPos.current.y = currentPlayer.y;
+              localPlayerPos.current.vy = currentPlayer.vy || 0;
+            }
           }
         } else {
           // Set interpolation target for other players
@@ -50,14 +55,18 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
     if (gameState && gameState.players) {
       const localPlayer = gameState.players.find(p => p.id === playerId);
       if (localPlayer) {
-        localPlayerPos.current = { x: localPlayer.x, y: localPlayer.y };
+        localPlayerPos.current = { 
+          x: localPlayer.x, 
+          y: localPlayer.y,
+          vy: localPlayer.vy || 0
+        };
       }
     }
 
-    // Handle keyboard input
+    // Handle keyboard input - Only left/right and jump
     const handleKeyDown = (e) => {
       const key = e.key.toLowerCase();
-      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+      if (['a', 'd', 'arrowleft', 'arrowright', ' '].includes(key)) {
         e.preventDefault();
         keysPressed.current[key] = true;
       }
@@ -71,16 +80,40 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 
-    // Check collision with obstacles
-    const checkCollision = (x, y, radius) => {
+    // Check if player is on ground (standing on a platform)
+    const isOnGround = (x, y, radius) => {
+      const feet = y + radius;
+      
       for (const obstacle of mapData.obstacles) {
-        const closestX = Math.max(obstacle.x, Math.min(x, obstacle.x + obstacle.width));
-        const closestY = Math.max(obstacle.y, Math.min(y, obstacle.y + obstacle.height));
-        const distanceX = x - closestX;
-        const distanceY = y - closestY;
-        const distanceSquared = distanceX * distanceX + distanceY * distanceY;
-        if (distanceSquared < radius * radius) {
-          return true;
+        // Check if feet are touching top of platform
+        if (x + radius > obstacle.x && 
+            x - radius < obstacle.x + obstacle.width &&
+            feet >= obstacle.y &&
+            feet <= obstacle.y + 5) {
+          return { onGround: true, groundY: obstacle.y - radius };
+        }
+      }
+      
+      // Check bottom boundary
+      if (feet >= mapData.height) {
+        return { onGround: true, groundY: mapData.height - radius };
+      }
+      
+      return { onGround: false, groundY: null };
+    };
+
+    // Check horizontal collision
+    const checkHorizontalCollision = (x, y, radius, direction) => {
+      for (const obstacle of mapData.obstacles) {
+        // Simple box collision for sides
+        if (y + radius > obstacle.y && 
+            y - radius < obstacle.y + obstacle.height) {
+          if (direction > 0 && x + radius >= obstacle.x && x - radius < obstacle.x) {
+            return true; // Hitting right side
+          }
+          if (direction < 0 && x - radius <= obstacle.x + obstacle.width && x + radius > obstacle.x + obstacle.width) {
+            return true; // Hitting left side
+          }
         }
       }
       return false;
@@ -91,8 +124,8 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
       ctx.fillStyle = mapData.backgroundColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Draw grid
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      // Draw grid (lighter for platformer feel)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
       ctx.lineWidth = 1;
       for (let x = 0; x < canvas.width; x += 50) {
         ctx.beginPath();
@@ -107,15 +140,23 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
         ctx.stroke();
       }
 
-      // Draw obstacles
+      // Draw obstacles (platforms)
       mapData.obstacles.forEach((obstacle) => {
         ctx.fillStyle = obstacle.color;
         ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
         
-        // Add border
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.lineWidth = 2;
+        // Add 3D border effect
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.lineWidth = 3;
         ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+        
+        // Top highlight
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(obstacle.x, obstacle.y);
+        ctx.lineTo(obstacle.x + obstacle.width, obstacle.y);
+        ctx.stroke();
       });
 
       // Draw players
@@ -138,7 +179,7 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
             const targetY = player.y;
             
             // Smooth interpolation (lerp)
-            const lerpFactor = Math.min(deltaTime * 10, 1); // Adjust speed of interpolation
+            const lerpFactor = Math.min(deltaTime * 10, 1);
             renderX = currentPos.x + (targetX - currentPos.x) * lerpFactor;
             renderY = currentPos.y + (targetY - currentPos.y) * lerpFactor;
             
@@ -149,7 +190,7 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
           // Player shadow
           ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
           ctx.beginPath();
-          ctx.arc(renderX + 3, renderY + 3, mapData.playerSize / 2, 0, Math.PI * 2);
+          ctx.arc(renderX + 2, renderY + 2, mapData.playerSize / 2, 0, Math.PI * 2);
           ctx.fill();
 
           // Player body
@@ -164,6 +205,15 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
           ctx.beginPath();
           ctx.arc(renderX, renderY, mapData.playerSize / 2, 0, Math.PI * 2);
           ctx.stroke();
+
+          // Player eyes (for direction indication)
+          if (!isTagger) {
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(renderX - 3, renderY - 2, 2, 0, Math.PI * 2);
+            ctx.arc(renderX + 3, renderY - 2, 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
 
           // Player name
           ctx.fillStyle = '#ffffff';
@@ -198,43 +248,56 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
     // Game loop using requestAnimationFrame
     const gameLoop = () => {
       const now = Date.now();
-      const deltaTime = (now - lastUpdateTime.current) / 1000;
+      const deltaTime = Math.min((now - lastUpdateTime.current) / 1000, 0.1); // Cap delta time
       lastUpdateTime.current = now;
 
-      // Calculate movement
+      // Horizontal movement only
       let dx = 0;
-      let dy = 0;
-
-      if (keysPressed.current['w'] || keysPressed.current['arrowup']) dy -= 1;
-      if (keysPressed.current['s'] || keysPressed.current['arrowdown']) dy += 1;
+      
       if (keysPressed.current['a'] || keysPressed.current['arrowleft']) dx -= 1;
       if (keysPressed.current['d'] || keysPressed.current['arrowright']) dx += 1;
 
-      // Normalize diagonal movement
-      if (dx !== 0 && dy !== 0) {
-        dx *= 0.707;
-        dy *= 0.707;
-      }
-
-      // Client-side prediction: Update local player position immediately
-      if (dx !== 0 || dy !== 0) {
+      const playerRadius = mapData.playerSize / 2;
+      
+      // Apply horizontal movement
+      if (dx !== 0) {
         const speed = PLAYER_SPEED * deltaTime;
         let newX = localPlayerPos.current.x + dx * speed;
-        let newY = localPlayerPos.current.y + dy * speed;
-
+        
         // Check boundaries
-        const playerRadius = mapData.playerSize / 2;
         newX = Math.max(playerRadius, Math.min(mapData.width - playerRadius, newX));
-        newY = Math.max(playerRadius, Math.min(mapData.height - playerRadius, newY));
-
-        // Check collision with obstacles
-        if (!checkCollision(newX, newY, playerRadius)) {
+        
+        // Check horizontal collision
+        if (!checkHorizontalCollision(newX, localPlayerPos.current.y, playerRadius, dx)) {
           localPlayerPos.current.x = newX;
-          localPlayerPos.current.y = newY;
         }
+      }
 
-        // Send movement to server (server is authoritative)
-        socket.emit('playerMove', { dx, dy });
+      // Apply gravity
+      localPlayerPos.current.vy += GRAVITY * deltaTime;
+      
+      // Apply vertical velocity
+      let newY = localPlayerPos.current.y + localPlayerPos.current.vy * deltaTime;
+      
+      // Check ground collision
+      const { onGround, groundY } = isOnGround(localPlayerPos.current.x, newY, playerRadius);
+      
+      if (onGround) {
+        localPlayerPos.current.y = groundY;
+        localPlayerPos.current.vy = 0;
+        
+        // Jump with spacebar
+        if (keysPressed.current[' ']) {
+          localPlayerPos.current.vy = -JUMP_FORCE;
+          keysPressed.current[' '] = false; // Prevent continuous jumping
+        }
+      } else {
+        localPlayerPos.current.y = newY;
+      }
+
+      // Send movement to server
+      if (dx !== 0 || keysPressed.current[' ']) {
+        socket.emit('playerMove', { dx, jump: keysPressed.current[' '] });
       }
 
       // Render game

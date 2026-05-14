@@ -143,8 +143,8 @@ function handlePlayerMove(socket, data) {
     const room = roomManager.getPlayerRoom(socket.id);
     if (!room || room.status !== 'playing') return;
 
-    const { dx, dy } = data;
-    gameController.updatePlayerMovement(room.code, socket.id, dx, dy);
+    const { dx, jump } = data;
+    gameController.updatePlayerMovement(room.code, socket.id, dx, jump || false);
   } catch (error) {
     console.error('Error handling player move:', error);
   }
