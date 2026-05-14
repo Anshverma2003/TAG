@@ -6,8 +6,15 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
   const canvasRef = useRef(null);
   const keysPressed = useRef({});
   const lastUpdateTime = useRef(Date.now());
+  const gameStateRef = useRef(gameState);
+  const animationFrameId = useRef(null);
 
   const mapData = MAPS[roomData.settings.mapId];
+
+  // Update gameState ref when it changes
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -33,36 +40,6 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-
-    // Game loop
-    const gameLoop = () => {
-      const now = Date.now();
-      const deltaTime = (now - lastUpdateTime.current) / 1000;
-      lastUpdateTime.current = now;
-
-      // Calculate movement
-      let dx = 0;
-      let dy = 0;
-
-      if (keysPressed.current['w'] || keysPressed.current['arrowup']) dy -= 1;
-      if (keysPressed.current['s'] || keysPressed.current['arrowdown']) dy += 1;
-      if (keysPressed.current['a'] || keysPressed.current['arrowleft']) dx -= 1;
-      if (keysPressed.current['d'] || keysPressed.current['arrowright']) dx += 1;
-
-      // Normalize diagonal movement
-      if (dx !== 0 && dy !== 0) {
-        dx *= 0.707;
-        dy *= 0.707;
-      }
-
-      // Send movement to server if moving
-      if (dx !== 0 || dy !== 0) {
-        socket.emit('playerMove', { dx, dy });
-      }
-
-      // Render game
-      renderGame(ctx);
-    };
 
     const renderGame = (ctx) => {
       // Clear canvas
@@ -96,9 +73,10 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
         ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
       });
 
-      // Draw players
-      if (gameState && gameState.players) {
-        gameState.players.forEach((player) => {
+      // Draw players using ref
+      const currentGameState = gameStateRef.current;
+      if (currentGameState && currentGameState.players) {
+        currentGameState.players.forEach((player) => {
           const isMe = player.id === playerId;
           const isTagger = player.isTagger;
 
@@ -151,14 +129,50 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
       }
     };
 
-    const intervalId = setInterval(gameLoop, 1000 / 60);
+    // Game loop using requestAnimationFrame
+    const gameLoop = () => {
+      const now = Date.now();
+      const deltaTime = (now - lastUpdateTime.current) / 1000;
+      lastUpdateTime.current = now;
+
+      // Calculate movement
+      let dx = 0;
+      let dy = 0;
+
+      if (keysPressed.current['w'] || keysPressed.current['arrowup']) dy -= 1;
+      if (keysPressed.current['s'] || keysPressed.current['arrowdown']) dy += 1;
+      if (keysPressed.current['a'] || keysPressed.current['arrowleft']) dx -= 1;
+      if (keysPressed.current['d'] || keysPressed.current['arrowright']) dx += 1;
+
+      // Normalize diagonal movement
+      if (dx !== 0 && dy !== 0) {
+        dx *= 0.707;
+        dy *= 0.707;
+      }
+
+      // Send movement to server if moving
+      if (dx !== 0 || dy !== 0) {
+        socket.emit('playerMove', { dx, dy });
+      }
+
+      // Render game
+      renderGame(ctx);
+
+      // Continue loop
+      animationFrameId.current = requestAnimationFrame(gameLoop);
+    };
+
+    // Start game loop
+    animationFrameId.current = requestAnimationFrame(gameLoop);
 
     return () => {
-      clearInterval(intervalId);
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+      }
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [gameState, playerId, roomData, mapData]);
+  }, [playerId, roomData, mapData]);
 
   return (
     <div className="flex justify-center">
