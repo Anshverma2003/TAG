@@ -1,8 +1,8 @@
 import { MAPS } from '../game/maps.js';
 
-const PLAYER_SPEED = 300; // pixels per second
-const JUMP_FORCE = 450; // Jump velocity
-const GRAVITY = 1200; // Gravity acceleration
+const PLAYER_SPEED = 250; // pixels per second
+const JUMP_FORCE = 500; // Jump velocity
+const GRAVITY = 1400; // Gravity acceleration
 const TAG_DISTANCE = 30; // distance to tag
 const UPDATE_RATE = 1000 / 60; // 60 FPS
 
@@ -110,6 +110,9 @@ export class GameController {
 
   // Check if player is standing on a platform
   isPlayerOnGround(player, mapData) {
+    // Only check ground when falling or stationary (not when jumping up)
+    if (player.vy < -5) return { onGround: false, groundY: null };
+    
     const playerRadius = mapData.playerSize / 2;
     const feet = player.y + playerRadius;
     
@@ -117,15 +120,15 @@ export class GameController {
       // Check if feet are touching top of platform
       if (player.x + playerRadius > obstacle.x && 
           player.x - playerRadius < obstacle.x + obstacle.width &&
-          feet >= obstacle.y &&
-          feet <= obstacle.y + 5 &&
+          feet >= obstacle.y - 2 &&
+          feet <= obstacle.y + 8 &&
           player.vy >= 0) {
         return { onGround: true, groundY: obstacle.y - playerRadius };
       }
     }
     
     // Check bottom boundary
-    if (feet >= mapData.height) {
+    if (feet >= mapData.height - 2) {
       return { onGround: true, groundY: mapData.height - playerRadius };
     }
     
@@ -137,23 +140,41 @@ export class GameController {
     const playerRadius = mapData.playerSize / 2;
     
     for (const obstacle of mapData.obstacles) {
-      // Check if player is at same height as obstacle
-      if (player.y + playerRadius > obstacle.y && 
+      // Check if player is at same height as obstacle (not standing on top)
+      if (player.y + playerRadius > obstacle.y + 5 && 
           player.y - playerRadius < obstacle.y + obstacle.height) {
         
         // Check right side collision
-        if (player.vx > 0 && newX + playerRadius >= obstacle.x && player.x + playerRadius < obstacle.x) {
+        if (player.vx > 0 && newX + playerRadius >= obstacle.x && newX + playerRadius <= obstacle.x + 5) {
           return obstacle.x - playerRadius;
         }
         
         // Check left side collision
-        if (player.vx < 0 && newX - playerRadius <= obstacle.x + obstacle.width && player.x - playerRadius > obstacle.x + obstacle.width) {
+        if (player.vx < 0 && newX - playerRadius <= obstacle.x + obstacle.width && newX - playerRadius >= obstacle.x + obstacle.width - 5) {
           return obstacle.x + obstacle.width + playerRadius;
         }
       }
     }
     
     return newX;
+  }
+
+  // Check ceiling collision
+  checkCeilingCollision(player, mapData) {
+    if (player.vy >= 0) return false; // Only check when moving up
+    
+    const playerRadius = mapData.playerSize / 2;
+    const head = player.y - playerRadius;
+    
+    for (const obstacle of mapData.obstacles) {
+      if (player.x + playerRadius > obstacle.x && 
+          player.x - playerRadius < obstacle.x + obstacle.width &&
+          head <= obstacle.y + obstacle.height &&
+          head >= obstacle.y + obstacle.height - 8) {
+        return true;
+      }
+    }
+    return false;
   }
 
   updatePlayerPositions(gameState, mapData, deltaTime) {
@@ -165,6 +186,11 @@ export class GameController {
       
       // Cap falling speed
       player.vy = Math.min(player.vy, 800);
+      
+      // Check ceiling collision
+      if (this.checkCeilingCollision(player, mapData)) {
+        player.vy = 0; // Stop upward movement
+      }
       
       // Update horizontal position
       let newX = player.x + player.vx * deltaTime;
@@ -195,10 +221,10 @@ export class GameController {
       }
       
       // Apply friction to horizontal movement
-      player.vx *= 0.85;
+      player.vx *= 0.88;
       
       // Stop if velocity is very small
-      if (Math.abs(player.vx) < 5) player.vx = 0;
+      if (Math.abs(player.vx) < 3) player.vx = 0;
     });
   }
 

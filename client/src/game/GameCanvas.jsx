@@ -10,6 +10,7 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
   const animationFrameId = useRef(null);
   const localPlayerPos = useRef({ x: 0, y: 0, vy: 0 }); // Client-side prediction with vertical velocity
   const interpolatedPlayers = useRef(new Map()); // Smooth interpolation for other players
+  const canJump = useRef(true); // Jump cooldown
 
   const mapData = MAPS[roomData.settings.mapId];
 
@@ -81,21 +82,24 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
     window.addEventListener('keyup', handleKeyUp);
 
     // Check if player is on ground (standing on a platform)
-    const isOnGround = (x, y, radius) => {
+    const isOnGround = (x, y, radius, vy) => {
+      // Only check ground when falling or stationary
+      if (vy < -5) return { onGround: false, groundY: null };
+      
       const feet = y + radius;
       
       for (const obstacle of mapData.obstacles) {
         // Check if feet are touching top of platform
         if (x + radius > obstacle.x && 
             x - radius < obstacle.x + obstacle.width &&
-            feet >= obstacle.y &&
-            feet <= obstacle.y + 5) {
+            feet >= obstacle.y - 2 &&
+            feet <= obstacle.y + 8) {
           return { onGround: true, groundY: obstacle.y - radius };
         }
       }
       
       // Check bottom boundary
-      if (feet >= mapData.height) {
+      if (feet >= mapData.height - 2) {
         return { onGround: true, groundY: mapData.height - radius };
       }
       
@@ -105,15 +109,32 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
     // Check horizontal collision
     const checkHorizontalCollision = (x, y, radius, direction) => {
       for (const obstacle of mapData.obstacles) {
-        // Simple box collision for sides
-        if (y + radius > obstacle.y && 
+        // Check if vertically aligned with obstacle (not just touching from top)
+        if (y + radius > obstacle.y + 5 && 
             y - radius < obstacle.y + obstacle.height) {
-          if (direction > 0 && x + radius >= obstacle.x && x - radius < obstacle.x) {
-            return true; // Hitting right side
+          if (direction > 0 && x + radius >= obstacle.x && x + radius <= obstacle.x + 5) {
+            return obstacle.x - radius; // Hitting right side
           }
-          if (direction < 0 && x - radius <= obstacle.x + obstacle.width && x + radius > obstacle.x + obstacle.width) {
-            return true; // Hitting left side
+          if (direction < 0 && x - radius <= obstacle.x + obstacle.width && x - radius >= obstacle.x + obstacle.width - 5) {
+            return obstacle.x + obstacle.width + radius; // Hitting left side
           }
+        }
+      }
+      return x;
+    };
+    
+    // Check ceiling collision
+    const checkCeilingCollision = (x, y, radius, vy) => {
+      if (vy >= 0) return false; // Only check when moving up
+      
+      const head = y - radius;
+      
+      for (const obstacle of mapData.obstacles) {
+        if (x + radius > obstacle.x && 
+            x - radius < obstacle.x + obstacle.width &&
+            head <= obstacle.y + obstacle.height &&
+            head >= obstacle.y + obstacle.height - 8) {
+          return true;
         }
       }
       return false;
@@ -251,25 +272,42 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
       const deltaTime = Math.min((now - lastUpdateTime.current) / 1000, 0.1); // Cap delta time
       lastUpdateTime.current = now;
 
-      // Horizontal movement only
-      let dx = 0;
-      
-      if (keysPressed.current['a'] || keysPressed.current['arrowleft']) dx -= 1;
-      if (keysPressed.current['d'] || keysPressed.current['arrowright']) dx += 1;
+      //newX = checkHorizontalCollision(newX, localPlayerPos.current.y, playerRadius, dx);
+        localPlayerPos.current.x = newX;
+      }
 
-      const playerRadius = mapData.playerSize / 2;
+      // Apply gravity
+      localPlayerPos.current.vy += GRAVITY * deltaTime;
       
-      // Apply horizontal movement
-      if (dx !== 0) {
-        const speed = PLAYER_SPEED * deltaTime;
-        let newX = localPlayerPos.current.x + dx * speed;
+      // Cap maximum fall speed
+      localPlayerPos.current.vy = Math.min(localPlayerPos.current.vy, 800);
+      
+      // Check ceiling collision
+      if (localPlayerPos.current.vy < 0 && checkCeilingCollision(
+        localPlayerPos.current.x, 
+        localPlayerPos.current.y, 
+        playerRadius, 
+        localPlayerPos.current.vy
+      )) {
+        localPlayerPos.current.vy = 0; // Stop upward movement
+      }
+      
+      // Apply vertical velocity
+      let newY = localPlayerPos.current.y + localPlayerPos.current.vy * deltaTime;
+      
+      // Check ground collision (only when falling or not jumping)
+      const { onGround, groundY } = isOnGround(
+        localPlayerPos.current.x, 
+        newY, 
+        playerRadius,
+        localPlayerPos.current.vy
+      );
+      
+      if (onGround) {
+        localPlayerPos.current.y = groundY;
+        localPlayerPos.current.vy = 0;
         
-        // Check boundaries
-        newX = Math.max(playerRadius, Math.min(mapData.width - playerRadius, newX));
-        
-        // Check horizontal collision
-        if (!checkHorizontalCollision(newX, localPlayerPos.current.y, playerRadius, dx)) {
-          localPlayerPos.current.x = newX;
+        // Jump with spacebar (only when on ground)ent.x = newX;
         }
       }
 
@@ -285,19 +323,24 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
       if (onGround) {
         localPlayerPos.current.y = groundY;
         localPlayerPos.current.vy = 0;
+        canJump.current = true; // Reset jump when on ground
         
-        // Jump with spacebar
-        if (keysPressed.current[' ']) {
+        // Jump with spacebar (only when on ground and can jump)
+        if (keysPressed.current[' '] && canJump.current) {
           localPlayerPos.current.vy = -JUMP_FORCE;
+          canJump.current = false;
           keysPressed.current[' '] = false; // Prevent continuous jumping
+          
+          // Send jump to server
+          socket.emit('playerMove', { dx: 0, jump: true });
         }
       } else {
         localPlayerPos.current.y = newY;
       }
 
-      // Send movement to server
-      if (dx !== 0 || keysPressed.current[' ']) {
-        socket.emit('playerMove', { dx, jump: keysPressed.current[' '] });
+      // Send horizontal movement to server
+      if (dx !== 0) {
+        socket.emit('playerMove', { dx, jump: false });
       }
 
       // Render game
