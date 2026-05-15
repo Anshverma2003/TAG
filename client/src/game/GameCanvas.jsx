@@ -274,7 +274,18 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
       const deltaTime = Math.min((now - lastUpdateTime.current) / 1000, 0.1); // Cap delta time
       lastUpdateTime.current = now;
 
-      //newX = checkHorizontalCollision(newX, localPlayerPos.current.y, playerRadius, dx);
+      const playerRadius = mapData.playerSize / 2;
+      
+      // Handle horizontal movement
+      let dx = 0;
+      if (keysPressed.current['a'] || keysPressed.current['arrowleft']) dx -= 1;
+      if (keysPressed.current['d'] || keysPressed.current['arrowright']) dx += 1;
+      
+      if (dx !== 0) {
+        let newX = localPlayerPos.current.x + dx * PLAYER_SPEED * deltaTime;
+        
+        // Check horizontal collision
+        newX = checkHorizontalCollision(newX, localPlayerPos.current.y, playerRadius, dx);
         localPlayerPos.current.x = newX;
       }
 
@@ -304,23 +315,6 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
         playerRadius,
         localPlayerPos.current.vy
       );
-      
-      if (onGround) {
-        localPlayerPos.current.y = groundY;
-        localPlayerPos.current.vy = 0;
-        
-        // Jump with spacebar (only when on ground)ent.x = newX;
-        }
-      }
-
-      // Apply gravity
-      localPlayerPos.current.vy += GRAVITY * deltaTime;
-      
-      // Apply vertical velocity
-      let newY = localPlayerPos.current.y + localPlayerPos.current.vy * deltaTime;
-      
-      // Check ground collision
-      const { onGround, groundY } = isOnGround(localPlayerPos.current.x, newY, playerRadius);
       
       if (onGround) {
         localPlayerPos.current.y = groundY;
