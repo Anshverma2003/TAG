@@ -84,22 +84,23 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
     // Check if player is on ground (standing on a platform)
     const isOnGround = (x, y, radius, vy) => {
       // Only check ground when falling or stationary
-      if (vy < -5) return { onGround: false, groundY: null };
+      if (vy < -10) return { onGround: false, groundY: null };
       
       const feet = y + radius;
       
       for (const obstacle of mapData.obstacles) {
         // Check if feet are touching top of platform
-        if (x + radius > obstacle.x && 
-            x - radius < obstacle.x + obstacle.width &&
-            feet >= obstacle.y - 2 &&
-            feet <= obstacle.y + 8) {
+        if (x + radius - 2 > obstacle.x && 
+            x - radius + 2 < obstacle.x + obstacle.width &&
+            feet >= obstacle.y - 3 &&
+            feet <= obstacle.y + 10 &&
+            vy >= -10) {
           return { onGround: true, groundY: obstacle.y - radius };
         }
       }
       
       // Check bottom boundary
-      if (feet >= mapData.height - 2) {
+      if (feet >= mapData.height - 3) {
         return { onGround: true, groundY: mapData.height - radius };
       }
       
@@ -110,13 +111,14 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
     const checkHorizontalCollision = (x, y, radius, direction) => {
       for (const obstacle of mapData.obstacles) {
         // Check if vertically aligned with obstacle (not just touching from top)
-        if (y + radius > obstacle.y + 5 && 
-            y - radius < obstacle.y + obstacle.height) {
-          if (direction > 0 && x + radius >= obstacle.x && x + radius <= obstacle.x + 5) {
-            return obstacle.x - radius; // Hitting right side
+        // Add small margin to avoid getting stuck on platforms
+        if (y + radius > obstacle.y + 8 && 
+            y - radius < obstacle.y + obstacle.height - 2) {
+          if (direction > 0 && x + radius >= obstacle.x - 1 && x + radius <= obstacle.x + 8) {
+            return obstacle.x - radius - 1; // Hitting right side
           }
-          if (direction < 0 && x - radius <= obstacle.x + obstacle.width && x - radius >= obstacle.x + obstacle.width - 5) {
-            return obstacle.x + obstacle.width + radius; // Hitting left side
+          if (direction < 0 && x - radius <= obstacle.x + obstacle.width + 1 && x - radius >= obstacle.x + obstacle.width - 8) {
+            return obstacle.x + obstacle.width + radius + 1; // Hitting left side
           }
         }
       }
@@ -130,10 +132,10 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
       const head = y - radius;
       
       for (const obstacle of mapData.obstacles) {
-        if (x + radius > obstacle.x && 
-            x - radius < obstacle.x + obstacle.width &&
-            head <= obstacle.y + obstacle.height &&
-            head >= obstacle.y + obstacle.height - 8) {
+        if (x + radius - 2 > obstacle.x && 
+            x - radius + 2 < obstacle.x + obstacle.width &&
+            head <= obstacle.y + obstacle.height + 2 &&
+            head >= obstacle.y + obstacle.height - 10) {
           return true;
         }
       }
@@ -279,8 +281,8 @@ const GameCanvas = forwardRef(({ gameState, playerId, roomData }, ref) => {
       // Apply gravity
       localPlayerPos.current.vy += GRAVITY * deltaTime;
       
-      // Cap maximum fall speed
-      localPlayerPos.current.vy = Math.min(localPlayerPos.current.vy, 800);
+      // Cap maximum fall speed for smoother landing
+      localPlayerPos.current.vy = Math.min(localPlayerPos.current.vy, 700);
       
       // Check ceiling collision
       if (localPlayerPos.current.vy < 0 && checkCeilingCollision(

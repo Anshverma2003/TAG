@@ -105,52 +105,65 @@ export const MAPS = {
     backgroundColor: '#87CEEB',
     playerSize: 20,
     obstacles: [
-      // Ground level platforms
-      { x: 0, y: 560, width: 200, height: 20, color: '#10b981' },
-      { x: 260, y: 520, width: 300, height: 20, color: '#10b981' },
-      { x: 650, y: 560, width: 150, height: 20, color: '#10b981' },
+      // Ground level platforms (y: 560-580)
+      { x: 0, y: 560, width: 250, height: 20, color: '#10b981' },
+      { x: 300, y: 560, width: 200, height: 20, color: '#10b981' },
+      { x: 550, y: 560, width: 250, height: 20, color: '#10b981' },
       
-      // Mid-low platforms
-      { x: 380, y: 430, width: 290, height: 20, color: '#10b981' },
-      { x: 0, y: 430, width: 100, height: 20, color: '#10b981' },
+      // Level 2 platforms - 70px higher (y: 490)
+      { x: 50, y: 490, width: 150, height: 20, color: '#10b981' },
+      { x: 250, y: 490, width: 180, height: 20, color: '#10b981' },
+      { x: 480, y: 490, width: 150, height: 20, color: '#10b981' },
+      { x: 680, y: 490, width: 120, height: 20, color: '#10b981' },
       
-      // Middle platforms
-      { x: 320, y: 340, width: 340, height: 20, color: '#10b981' },
-      { x: 0, y: 340, width: 180, height: 20, color: '#10b981' },
+      // Level 3 platforms - 70px higher (y: 420)
+      { x: 0, y: 420, width: 120, height: 20, color: '#10b981' },
+      { x: 170, y: 420, width: 160, height: 20, color: '#10b981' },
+      { x: 380, y: 420, width: 140, height: 20, color: '#10b981' },
+      { x: 570, y: 420, width: 230, height: 20, color: '#10b981' },
       
-      // Mid-high platforms
-      { x: 0, y: 250, width: 280, height: 20, color: '#10b981' },
-      { x: 450, y: 250, width: 250, height: 20, color: '#10b981' },
+      // Level 4 platforms - 70px higher (y: 350)
+      { x: 50, y: 350, width: 180, height: 20, color: '#10b981' },
+      { x: 280, y: 350, width: 150, height: 20, color: '#10b981' },
+      { x: 480, y: 350, width: 120, height: 20, color: '#10b981' },
+      { x: 650, y: 350, width: 150, height: 20, color: '#10b981' },
       
-      // Top platforms
-      { x: 630, y: 130, width: 170, height: 20, color: '#10b981' },
-      { x: 320, y: 130, width: 200, height: 20, color: '#10b981' },
+      // Level 5 platforms - 70px higher (y: 280)
+      { x: 0, y: 280, width: 140, height: 20, color: '#10b981' },
+      { x: 190, y: 280, width: 160, height: 20, color: '#10b981' },
+      { x: 400, y: 280, width: 180, height: 20, color: '#10b981' },
+      { x: 630, y: 280, width: 170, height: 20, color: '#10b981' },
       
-      // Trees (decorative vertical obstacles)
-      { x: 100, y: 500, width: 30, height: 60, color: '#059669' },
-      { x: 500, y: 370, width: 30, height: 60, color: '#059669' },
-      { x: 140, y: 280, width: 30, height: 60, color: '#059669' },
-      { x: 720, y: 70, width: 30, height: 60, color: '#059669' },
+      // Top level platforms - 70px higher (y: 210)
+      { x: 80, y: 210, width: 150, height: 20, color: '#10b981' },
+      { x: 280, y: 210, width: 140, height: 20, color: '#10b981' },
+      { x: 470, y: 210, width: 160, height: 20, color: '#10b981' },
+      { x: 680, y: 210, width: 120, height: 20, color: '#10b981' },
       
-      // Small blocks/obstacles
-      { x: 240, y: 280, width: 50, height: 50, color: '#10b981' },
-      { x: 580, y: 470, width: 40, height: 40, color: '#f59e0b' },
+      // Decorative trees (thin, easy to jump over)
+      { x: 100, y: 520, width: 25, height: 40, color: '#059669' },
+      { x: 350, y: 520, width: 25, height: 40, color: '#059669' },
+      { x: 200, y: 450, width: 25, height: 40, color: '#059669' },
+      { x: 500, y: 380, width: 25, height: 40, color: '#059669' },
+      { x: 300, y: 310, width: 25, height: 40, color: '#059669' },
+      { x: 700, y: 240, width: 25, height: 40, color: '#059669' },
     ],
     spawnPoints: [
-      { x: 100, y: 540 },
-      { x: 450, y: 500 },
-      { x: 120, y: 230 },
-      { x: 580, y: 230 },
-      { x: 480, y: 320 },
-      { x: 700, y: 110 },
-      { x: 400, y: 110 },
-      { x: 550, y: 410 },
+      { x: 120, y: 540 },
+      { x: 400, y: 540 },
+      { x: 680, y: 540 },
+      { x: 120, y: 470 },
+      { x: 350, y: 470 },
+      { x: 700, y: 470 },
+      { x: 240, y: 400 },
+      { x: 650, y: 400 },
     ],
   },
 };
 
-export const PLAYER_SPEED = 250; // pixels per second (horizontal movement)
-export const JUMP_FORCE = 500; // Jump velocity (increased for better feel)
-export const GRAVITY = 1400; // Gravity acceleration
+export const PLAYER_SPEED = 280; // pixels per second (horizontal movement)
+export const JUMP_FORCE = 600; // Jump velocity - consistent jump height ~80 pixels
+export const GRAVITY = 1600; // Gravity acceleration
 export const TAG_DISTANCE = 30; // distance to tag another player
 export const SERVER_UPDATE_RATE = 1000 / 60; // 60 FPS
+export const JUMP_HEIGHT = 80; // Approximate jump height in pixels

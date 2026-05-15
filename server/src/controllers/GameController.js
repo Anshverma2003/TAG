@@ -1,8 +1,8 @@
 import { MAPS } from '../game/maps.js';
 
-const PLAYER_SPEED = 250; // pixels per second
-const JUMP_FORCE = 500; // Jump velocity
-const GRAVITY = 1400; // Gravity acceleration
+const PLAYER_SPEED = 280; // pixels per second
+const JUMP_FORCE = 600; // Jump velocity - consistent jump height
+const GRAVITY = 1600; // Gravity acceleration
 const TAG_DISTANCE = 30; // distance to tag
 const UPDATE_RATE = 1000 / 60; // 60 FPS
 
@@ -111,24 +111,24 @@ export class GameController {
   // Check if player is standing on a platform
   isPlayerOnGround(player, mapData) {
     // Only check ground when falling or stationary (not when jumping up)
-    if (player.vy < -5) return { onGround: false, groundY: null };
+    if (player.vy < -10) return { onGround: false, groundY: null };
     
     const playerRadius = mapData.playerSize / 2;
     const feet = player.y + playerRadius;
     
     for (const obstacle of mapData.obstacles) {
-      // Check if feet are touching top of platform
-      if (player.x + playerRadius > obstacle.x && 
-          player.x - playerRadius < obstacle.x + obstacle.width &&
-          feet >= obstacle.y - 2 &&
-          feet <= obstacle.y + 8 &&
-          player.vy >= 0) {
+      // Check if feet are touching top of platform with lenient collision
+      if (player.x + playerRadius - 2 > obstacle.x && 
+          player.x - playerRadius + 2 < obstacle.x + obstacle.width &&
+          feet >= obstacle.y - 3 &&
+          feet <= obstacle.y + 10 &&
+          player.vy >= -10) {
         return { onGround: true, groundY: obstacle.y - playerRadius };
       }
     }
     
     // Check bottom boundary
-    if (feet >= mapData.height - 2) {
+    if (feet >= mapData.height - 3) {
       return { onGround: true, groundY: mapData.height - playerRadius };
     }
     
@@ -141,17 +141,18 @@ export class GameController {
     
     for (const obstacle of mapData.obstacles) {
       // Check if player is at same height as obstacle (not standing on top)
-      if (player.y + playerRadius > obstacle.y + 5 && 
-          player.y - playerRadius < obstacle.y + obstacle.height) {
+      // Add margins to prevent getting stuck
+      if (player.y + playerRadius > obstacle.y + 8 && 
+          player.y - playerRadius < obstacle.y + obstacle.height - 2) {
         
         // Check right side collision
-        if (player.vx > 0 && newX + playerRadius >= obstacle.x && newX + playerRadius <= obstacle.x + 5) {
-          return obstacle.x - playerRadius;
+        if (player.vx > 0 && newX + playerRadius >= obstacle.x - 1 && newX + playerRadius <= obstacle.x + 8) {
+          return obstacle.x - playerRadius - 1;
         }
         
         // Check left side collision
-        if (player.vx < 0 && newX - playerRadius <= obstacle.x + obstacle.width && newX - playerRadius >= obstacle.x + obstacle.width - 5) {
-          return obstacle.x + obstacle.width + playerRadius;
+        if (player.vx < 0 && newX - playerRadius <= obstacle.x + obstacle.width + 1 && newX - playerRadius >= obstacle.x + obstacle.width - 8) {
+          return obstacle.x + obstacle.width + playerRadius + 1;
         }
       }
     }
@@ -167,10 +168,10 @@ export class GameController {
     const head = player.y - playerRadius;
     
     for (const obstacle of mapData.obstacles) {
-      if (player.x + playerRadius > obstacle.x && 
-          player.x - playerRadius < obstacle.x + obstacle.width &&
-          head <= obstacle.y + obstacle.height &&
-          head >= obstacle.y + obstacle.height - 8) {
+      if (player.x + playerRadius - 2 > obstacle.x && 
+          player.x - playerRadius + 2 < obstacle.x + obstacle.width &&
+          head <= obstacle.y + obstacle.height + 2 &&
+          head >= obstacle.y + obstacle.height - 10) {
         return true;
       }
     }
@@ -184,8 +185,8 @@ export class GameController {
       // Apply gravity
       player.vy += GRAVITY * deltaTime;
       
-      // Cap falling speed
-      player.vy = Math.min(player.vy, 800);
+      // Cap falling speed for smoother landing
+      player.vy = Math.min(player.vy, 700);
       
       // Check ceiling collision
       if (this.checkCeilingCollision(player, mapData)) {
@@ -221,10 +222,10 @@ export class GameController {
       }
       
       // Apply friction to horizontal movement
-      player.vx *= 0.88;
+      player.vx *= 0.90;
       
       // Stop if velocity is very small
-      if (Math.abs(player.vx) < 3) player.vx = 0;
+      if (Math.abs(player.vx) < 2) player.vx = 0;
     });
   }
 
